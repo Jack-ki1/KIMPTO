@@ -322,5 +322,3 @@ Built on standard ES modules, `fetch`, CSS custom properties, and
 Edge, Firefox, and Safari. One-click desktop install (PWA) is a
 Chromium-specific feature (Chrome/Edge); Firefox and Safari users get the
 full app experience in-browser but not the native install prompt.
-#   K I M P T O  
- 
