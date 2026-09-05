@@ -20,11 +20,21 @@ export function saveSettings(settings){
 }
 
 export function loadHistory(){
-  try{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
-  catch(e){ return []; }
+  const stored = localStorage.getItem(HISTORY_KEY);
+  if (!stored) return [];
+  try {
+    const parsed = JSON.parse(stored);
+    // Ensure history items have the 'versions' property after the update
+    return parsed.map(item => ({
+      ...item,
+      versions: item.versions || {} // Provide empty object if 'versions' is missing
+    })).slice(0, MAX_HISTORY);
+  } catch (e) {
+    console.warn("Could not parse history from localStorage, returning empty array.", e);
+    return [];
+  }
 }
 
-export function saveHistory(list){
-  try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY))); }
-  catch(e){ /* degrade silently */ }
+export function saveHistory(arr){
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(0, MAX_HISTORY)));
 }

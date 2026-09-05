@@ -35,8 +35,13 @@ export function renderHistory(listEl, history, onSelect){
     const btn = document.createElement("button");
     btn.className = "history-item";
     btn.type = "button";
-    btn.textContent = item.task;
-    btn.title = item.task;
+    // Use the first few words of the task as the main text, truncate if necessary
+    let displayText = item.task || "";
+    if (displayText.length > 60) {
+        displayText = displayText.substring(0, 57) + '...';
+    }
+    btn.textContent = displayText;
+    btn.title = item.task; // Show full task on hover
     btn.addEventListener("click", () => onSelect(item));
     listEl.appendChild(btn);
   });

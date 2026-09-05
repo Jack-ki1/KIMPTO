@@ -100,6 +100,15 @@
         </div>
 
         <div>
+          <div class="section-label">TEMPLATES</div>
+          <div class="history-list" id="templateList">
+            <div class="history-item">Blog Post Outline</div>
+            <div class="history-item">Social Media Ad</div>
+            <div class="history-item">Code Explanation</div>
+          </div>
+        </div>
+
+        <div>
           <div class="section-label">HISTORY</div>
           <div class="history-list" id="historyList">
             <div class="history-empty">Nothing generated yet</div>
@@ -123,10 +132,27 @@
       </div>
 
       <div class="input-card">
-        <textarea id="taskInput" placeholder="e.g. Summarize long customer support tickets into a 3-bullet action list for my team lead"></textarea>
-        <div class="input-divider"></div>
-        <div class="constraints-row">
-          <input type="text" id="constraintsInput" placeholder="Optional: extra constraints, audience, tone, length…" />
+        <div class="modular-prompt-builder">
+          <div class="field">
+            <label for="roleInput">Role</label>
+            <input type="text" id="roleInput" placeholder="e.g. Expert SEO writer" />
+          </div>
+          <div class="field">
+            <label for="taskInput">Task</label>
+            <textarea id="taskInput" placeholder="e.g. Summarize long customer support tickets into a 3-bullet action list for my team lead"></textarea>
+          </div>
+          <div class="field">
+            <label for="audienceInput">Audience</label>
+            <input type="text" id="audienceInput" placeholder="e.g. Busy team leads" />
+          </div>
+          <div class="field">
+            <label for="formatInput">Format</label>
+            <input type="text" id="formatInput" placeholder="e.g. Bullet points" />
+          </div>
+          <div class="field">
+            <label for="constraintsInput">Constraints</label>
+            <input type="text" id="constraintsInput" placeholder="e.g. Maximum 100 words" />
+          </div>
         </div>
         <div class="generate-row">
           <span style="font-size:11px;color:var(--text-faint);" id="charCount">0 characters</span>

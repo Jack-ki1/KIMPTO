@@ -120,10 +120,17 @@ function init(){
 function onHistorySelect(item){
   els.taskInput.value = item.task;
   els.constraintsInput.value = item.constraints || "";
+  // Display the full prompt of the first version (or any specific one) in the task input if desired, otherwise just the task
+  // For now, keeping it as task/constraints for context, results will be re-rendered if item.versions exist.
   updateCharCount();
   els.placeholderZone.style.display = "none";
   els.resultsZone.style.display = "";
-  renderResults(els.resultsZone, item.versions);
+  if (item.versions) {
+    renderResults(els.resultsZone, item.versions);
+  } else {
+      // Fallback if versions are not saved, render empty or show a message
+      els.resultsZone.innerHTML = '<div class="placeholder">Stored result details not available.</div>';
+  }
 }
 
 function onThemeSelect(themeId){
@@ -268,6 +275,7 @@ async function generate(){
       if (target && target.prompt) await copyToClipboard(target.prompt, null);
     }
 
+    // Save history item including the generated versions
     history.unshift({ task, constraints, versions: parsed, ts: Date.now() });
     history = history.slice(0, 8);
     saveHistory(history);
