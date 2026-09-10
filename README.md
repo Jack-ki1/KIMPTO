@@ -1,324 +1,554 @@
-# Kimpto — Prompt Generator Console
+# Kimpto — Prompt Engineering Studio
 
-Kimpto turns one task description into **three structurally distinct
-prompts** — Direct & Concise, Role-Based & Detailed, and Creative & Advanced
-— tuned by a 12-control customization console, themeable, and installable as
-a standalone desktop app. It's a static site: no build step, no backend, no
-server costs, and no framework — plain ES modules the browser runs directly.
+Kimpto turns a plain-language task description into several genuinely
+different, prompt-engineered versions — each grounded in a real,
+documented prompt-engineering technique — scores each one, lets you test
+it against a real model before you commit to it, and remembers everything
+in your own browser.
 
-It's powered by either **free, keyless AI models** (via
-[Puter.js](https://developer.puter.com)) or **your own Gemini/Groq API key**.
+This is the Flask rebuild: a real Python backend, server-rendered HTML,
+hand-written CSS, and vanilla JavaScript on the frontend — no build step,
+no bundler, no framework lock-in.
 
-## Contents
+![Empty state](docs/screenshots/empty-state.png)
 
-- [Features](#features)
+---
+
+## Table of contents
+
+- [What Kimpto does](#what-kimpto-does)
+- [Screenshots](#screenshots)
+- [Architecture](#architecture)
 - [Project structure](#project-structure)
-- [Running it locally](#running-it-locally)
-- [Deploying it](#deploying-it)
-- [Installing it as a desktop app](#installing-it-as-a-desktop-app)
-- [Engines & models](#engines--models)
-- [The Console — 12 customizations](#the-console--12-customizations)
-- [How the prompt engine works](#how-the-prompt-engine-works)
-- [Testing guidelines](#testing-guidelines)
-- [Extending Kimpto](#extending-kimpto)
-- [Troubleshooting / FAQ](#troubleshooting--faq)
-- [Security & privacy](#security--privacy)
+- [Requirements](#requirements)
+- [Quickstart](#quickstart)
+- [Running it from your desktop](#running-it-from-your-desktop)
+- [Environment variables](#environment-variables)
+- [Testing](#testing)
+- [API reference](#api-reference)
+- [The technique library](#the-technique-library)
+- [Model-specific formatting conventions](#model-specific-formatting-conventions)
+- [The free model catalog](#the-free-model-catalog)
+- [Bring your own key](#bring-your-own-key)
+- [Putting the code on GitHub](#putting-the-code-on-github)
+- [Deploying the live app](#deploying-the-live-app)
+- [Why not GitHub Pages?](#why-not-github-pages)
+- [Security notes](#security-notes)
 - [Browser support](#browser-support)
+- [Known limitations & roadmap](#known-limitations--roadmap)
+- [Credits & research this is grounded in](#credits--research-this-is-grounded-in)
+- [License](#license)
 
-## Features
+---
 
-- **Two ways to reach a model** — keyless via Puter.js, or bring-your-own-key
-  for Gemini/Groq, switchable per generation from the sidebar
-- **One call, three versions** — a single request returns all three prompt
-  variants as structured JSON, so they're generated aware of each other
-  rather than as three independent, possibly-overlapping calls
-- **12 live customizations** grouped into Output / Engine tuning / Interface,
-  every one of which actually changes the request sent to the model, not
-  just the UI
-- **4 hand-built themes** — Graphite, Daybreak, Phosphor, Aurora — each with
-  its own full color system, not a single light/dark toggle
-- **Installable** — a real web app manifest + service worker, so Chrome/Edge
-  can install it as a standalone window with its own icon
-- **Persistent** — settings and the last 8 generations survive a reload via
-  `localStorage`; no account, no database
-- **Copy-to-clipboard per card**, keyboard shortcut (`Ctrl`/`Cmd`+`Enter`) to
-  generate, and defensive JSON parsing so a model that wraps its answer in
-  markdown fences still renders correctly
+## What Kimpto does
+
+1. You describe a task once — "Summarize long customer support tickets
+   into a 3-bullet action list for my team lead."
+2. You pick which prompt-engineering **techniques** to generate (Direct &
+   Concise, Role-Based & Detailed, Creative & Few-Shot, Chain-of-Thought,
+   Structured Output, Meta-Prompt) and which **model** you're writing for
+   (Claude, GPT, Gemini, or 40+ other free models) in Settings.
+3. Kimpto generates one genuinely different prompt per technique,
+   formatted using that model vendor's own documented conventions —
+   Claude gets XML-tagged sections, GPT gets Markdown-delimited sections,
+   Gemini gets the PTCF (Persona/Task/Context/Format) pattern.
+4. Every generated prompt is instantly, freely scored by a heuristic
+   linter (does it specify a format? hard constraints? a persona? is it
+   long enough to not be vague?) — no model call needed for this part.
+5. You can **Test** any version against a real model with a sample input
+   before you trust it, **Refine** it with a plain-language instruction
+   ("make it shorter", "add a persona") instead of just re-rolling,
+   **Compare** two versions with a word-level diff, **Save** it to a
+   tagged library, or **Copy** it as plain text or a ready-to-run Python
+   snippet.
+6. You can dictate the task by voice and have any generated prompt read
+   back to you — both via the browser's native Web Speech API, no
+   extra service required.
+
+Two ways to actually generate text:
+
+- **Free** — routed through [Puter.js](https://developer.puter.com),
+  which gives keyless, unlimited-feeling access to 40+ models across
+  OpenAI, Anthropic, Google, xAI, DeepSeek, Meta, Mistral, Qwen, and more,
+  directly from the browser. No signup, no key, no server involvement.
+- **Bring your own key** — pick Claude, GPT, or Gemini, paste your own
+  API key, and generation is proxied through this app's Flask backend
+  using each vendor's official Python SDK.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Settings — model picker](docs/screenshots/settings-model-picker.png) | ![Thread with a refined card](docs/screenshots/thread-refine.png) |
+| Settings: 42+ free models grouped by provider, or bring your own key | A refined prompt mid-thread, with score, checklist dots, and actions |
+| ![Dark mode](docs/screenshots/dark-mode.png) | |
+| Dark mode shares the same gradient identity | |
+
+## Architecture
+
+```
+Browser                                   Flask backend
+┌─────────────────────────────┐           ┌──────────────────────────────┐
+│ templates/index.html         │  GET /    │ routes/views.py               │
+│ static/css/styles.css        │◄──────────┤ routes/api.py                 │
+│ static/js/*.js (ES modules)  │           │ services/prompt_engine.py     │
+│                               │  /api/... │ services/linter.py            │
+│  Free tier ───────────────┐  │◄─────────►│ services/models_catalog.py    │
+│  │ Puter.js (CDN, browser) │  │           │ services/providers.py         │
+│  └─────────────────────────┘  │           │  (anthropic / openai /        │
+│  BYOK tier ─────────────────┼──┼──────────►   google-genai SDKs)          │
+└─────────────────────────────┘           └──────────────────────────────┘
+```
+
+The split exists for a real architectural reason, not convenience:
+Puter.js's free, keyless access is tied to an anonymous **browser**
+session — it cannot be called from a Python process. So **free-tier
+generation happens entirely client-side**, calling Puter.js directly.
+**Bring-your-own-key generation happens server-side**, because that's
+where it's safe to hold a real API key for the lifetime of one request
+and call each vendor's official SDK.
+
+Both paths need identical technique wording and identical vendor
+formatting conventions, so rather than hand-duplicating that text in two
+languages, **Python is the single source of truth**:
+`kimpto/services/prompt_engine.py` defines the six techniques and the
+model-specific conventions once. The browser fetches them at load time
+from `GET /api/techniques` and `GET /api/models` and formats the same
+template strings client-side for the free-tier path. If you ever want to
+add a seventh technique or change how the Claude convention is worded,
+there is exactly one file to edit.
 
 ## Project structure
 
 ```
-kimpto/
-├── index.html                      Page shell: topbar, sidebar, main, console drawer
-├── manifest.webmanifest            PWA metadata — name, icons, standalone display mode
-├── service-worker.js               Caches the static shell only; never touches API calls
-├── css/
-│   └── styles.css                  All 4 theme variable sets + every component's styles
-├── js/
-│   ├── config.js                   Model lists, customization option tables, buildSystemPrompt()
-│   ├── storage.js                  localStorage read/write for settings + history
-│   ├── engines.js                  callPuter() / callGemini() / callGroq() + JSON extraction
-│   ├── ui.js                       DOM rendering: console, result cards, history, theme menu
-│   └── main.js                     Wires it all together; the generate() orchestration flow
-├── icons/                          App icons: 192px, 512px, maskable 512px, favicons
+kimpto-flask/
+├── app.py                        # WSGI entrypoint (python app.py / gunicorn app:app)
+├── requirements.txt
+├── Procfile                      # for Render / Railway / Heroku-style platforms
+├── run.sh / run.bat               # desktop launchers (see below)
+├── .env.example
+├── .gitignore
+├── LICENSE
+├── conftest.py                    # empty — puts the project root on pytest's sys.path
+├── kimpto/
+│   ├── __init__.py                # Flask application factory (create_app)
+│   ├── routes/
+│   │   ├── views.py               # GET /  → renders templates/index.html
+│   │   └── api.py                 # /api/techniques, /api/models, /api/lint,
+│   │                               #   /api/generate, /api/refine, /api/test-run
+│   ├── services/
+│   │   ├── prompt_engine.py       # technique catalog + prompt assembly (the source of truth)
+│   │   ├── linter.py              # heuristic prompt-quality scoring
+│   │   ├── models_catalog.py      # 42+ free models + BYOK provider/model lists
+│   │   └── providers.py           # Anthropic / OpenAI / Google SDK wrappers (BYOK only)
+│   ├── templates/
+│   │   ├── base.html
+│   │   └── index.html
+│   └── static/
+│       ├── css/styles.css
+│       ├── js/
+│       │   ├── main.js            # app state + event wiring
+│       │   ├── ui.js              # all DOM rendering
+│       │   ├── api.js             # generate/refine/test-run dispatcher (Puter vs Flask)
+│       │   ├── catalog.js         # fetches + mirrors prompt_engine.py client-side
+│       │   ├── voice.js           # Web Speech API (input + output)
+│       │   ├── storage.js         # localStorage persistence
+│       │   ├── dom.js             # tiny hyperscript-style DOM builder
+│       │   └── icons.js           # inline SVG icon set
+│       ├── icons/                 # PWA icons
+│       ├── manifest.webmanifest
+│       └── service-worker.js      # offline app-shell caching
 ├── tests/
-│   ├── smoke_test.py               Automated end-to-end test suite (Playwright)
-│   └── MANUAL-QA-CHECKLIST.md      No-tooling-required manual test pass
-└── README.md                       You are here
+│   ├── test_prompt_engine.py
+│   ├── test_linter.py
+│   └── test_routes.py
+└── docs/screenshots/
 ```
 
-No `package.json`, no bundler, no `node_modules` in the shipped app — every
-`<script type="module">` import in `index.html` → `js/main.js` resolves
-directly to a file in this repo. That's deliberate: it keeps deployment to
-"upload these files" with nothing to build first.
+## Requirements
 
-## Running it locally
+- **Python 3.10+** (uses `dataclass`, `X | None` type hints, `dict[str, ...]`)
+- A modern browser. Voice input (dictation) needs a Chromium-based browser
+  (Chrome, Edge, Brave, Arc) — Firefox and Safari don't implement
+  `SpeechRecognition` yet. Voice output (read-aloud) works broadly.
+- No database, no Node.js, no build step.
 
-Any static file server works, since ES modules must be served over
-`http(s)://`, not opened as a bare `file://` path (the browser blocks module
-imports from `file://` for security reasons). Pick whichever you already
-have installed:
+## Quickstart
 
 ```bash
-# Python (built into most systems)
-py -m http.server 8080
+git clone <your-repo-url> kimpto
+cd kimpto
 
-# Node
-npx http-server -p 8080
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# PHP
-php -S localhost:8080
+pip install -r requirements.txt
+
+python app.py
 ```
 
-Then open `http://localhost:8080/index.html`.
+Then open **http://127.0.0.1:5000**. That's it — the free tier works
+immediately with no configuration; bring-your-own-key providers just need
+a key pasted into Settings whenever you want to use them.
 
-## Deploying it
+If you only ever plan to use the free tier and want a lighter install,
+you can trim `anthropic`, `openai`, and `google-genai` out of
+`requirements.txt` — the app still runs fine and those routes just return
+a clear error instead of a stack trace if someone tries to use bring-your-
+own-key without the corresponding package installed.
 
-### GitHub Pages
-1. Create a repo (e.g. `kimpto`) and push everything in this folder to it,
-   with `index.html` at the repo root (or the folder you point Pages at).
-2. **Settings → Pages → Source → Deploy from a branch**, choose `main` and
-   `/ (root)`, save.
-3. Your app is live at `https://yourname.github.io/kimpto/` within a minute
-   or two. GitHub Pages serves everything over HTTPS automatically, which
-   the Puter.js popup flow and the service worker both require.
+## Running it from your desktop
 
-### Netlify / Vercel / Cloudflare Pages
-All three auto-detect "no build command, publish the root folder" for a
-plain static site — drag-and-drop the `kimpto/` folder onto Netlify's
-deploy target, or run `vercel` / `wrangler pages deploy` from inside the
-folder. No configuration file is required for any of them.
+Two double-clickable launchers are included so you don't need to
+remember any commands day-to-day:
 
-### Any other static host
-Amazon S3 + CloudFront, an nginx box, a shared host — anything that serves
-static files over HTTPS works identically. The only requirement is HTTPS
-(or `localhost`), because service workers and some clipboard APIs refuse to
-run over plain HTTP.
+- **macOS / Linux: `run.sh`**
+  ```bash
+  chmod +x run.sh      # once
+  ./run.sh
+  ```
+  On first run it creates a `.venv`, installs dependencies, starts the
+  server, and opens your browser to it automatically. To get a real
+  desktop icon: on macOS, right-click `run.sh` → *Make Alias*, drag the
+  alias to your desktop; on Linux, create a `.desktop` file or a symlink
+  (`ln -s /full/path/to/run.sh ~/Desktop/Kimpto`) and mark it executable.
 
-## Installing it as a desktop app
+- **Windows: `run.bat`**
+  Double-click it directly, or right-click → *Send to* → *Desktop (create
+  shortcut)* to get a proper desktop icon. It does the same setup dance
+  (venv, install, launch, open browser).
 
-Once it's hosted (or even running locally), open it in Chrome and use
-**either** of these:
+Both scripts are idempotent — running them again just reuses the existing
+virtual environment and (re)starts the server, so they're safe as a
+permanent "open Kimpto" shortcut.
 
-**Option A — Install as a PWA (recommended)**
-Click the install icon (⊕) in Chrome's address bar, or Chrome menu (⋮) →
-**"Install Kimpto…"**. This uses `manifest.webmanifest` to open a real
-standalone window with the Kimpto icon, no tabs or address bar, pinnable to
-your taskbar/dock and optionally your desktop.
+## Environment variables
 
-**Option B — Create Shortcut**
-Chrome menu (⋮) → **More Tools → Create Shortcut…** → check **"Open as
-window"** → Create. Drops an icon directly on your desktop that opens Kimpto
-in its own app-style window, no PWA install prompt required.
+See `.env.example`. In short:
 
-Edge supports the same install flow via its own menu. Firefox and Safari
-don't offer the same one-click desktop install for arbitrary sites, though
-the site itself works fully in either browser.
-
-> **First run:** if you use the Free engine, Puter opens a one-time sign-in
-> popup. Make sure the browser (or the installed app window) isn't blocking
-> popups for Kimpto — after that first sign-in it's remembered for future
-> sessions.
-
-## Engines & models
-
-### Free — Puter.js (no key)
-Routed through Puter's hosted infrastructure at `js.puter.com`. The curated
-model list in `config.js` (`PUTER_MODELS`) currently offers GPT-5.5, GPT-5.4
-Nano, Claude Opus 5, Claude Sonnet 5, Gemini 3.7 Flash, and Grok 4.6, plus a
-"Default" option and a free-text custom model id field for anything Puter
-adds later. Reliability depends on Puter's own uptime and free-tier terms,
-not an official provider SLA — treat it as the low-friction default, not a
-guarantee.
-
-### My Key — Gemini
-Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) —
-no credit card required for the Flash-tier models Kimpto uses
-(`gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-3-flash`). Gemini is
-built to support direct browser calls, which is why it's the more reliable
-BYOK option of the two.
-
-### My Key — Groq
-Get a free key at [console.groq.com](https://console.groq.com/keys). Groq is
-dramatically fast, but its documentation and SDKs are written for
-server-side use — a direct browser call can be blocked by CORS depending on
-your account. Kimpto attempts it anyway and surfaces a specific "this is
-almost always a CORS block" message if the request never leaves the browser,
-so a failure here reads as a diagnosis, not a mystery.
-
-## The Console — 12 customizations
-
-Open it from the sliders icon in the topbar or the **Customize** button
-above the input box. Every control edits `settings` in `main.js`, which
-`config.js`'s `buildSystemPrompt()` turns into actual instruction text (or,
-for Creativity, the API's `temperature` parameter) — nothing here is
-cosmetic-only.
-
-| Group | Control | What it actually changes |
+| Variable | Default | Purpose |
 |---|---|---|
-| Output | **Length** | Word-count targets injected per version (Short/Standard/Long) |
-| Output | **Content type** | Domain framing line — code, writing, marketing, data, image-gen, academic, or general |
-| Output | **Output language** | The language the generated *prompt text* is written in (JSON keys stay in English so parsing stays reliable) |
-| Output | **Tone** | The register the generated prompts are written in |
-| Output | **Markdown formatting** | Whether the generated prompts use light markdown or plain text |
-| Engine tuning | **Creativity** | Sent directly as `temperature` to the API (0.2–1.2) |
-| Engine tuning | **Few-shot depth** | 1 or 2 example pairs required inside Version 3 |
-| Engine tuning | **Persona intensity** | Light (one-line) vs. deep (named sub-specialty + stakes) persona for Version 2 |
-| Engine tuning | **Negative constraints** | Free text folded into all three versions as things to avoid |
-| Interface | **Theme** | Graphite / Daybreak / Phosphor / Aurora |
-| Interface | **Density** | Comfortable vs. compact spacing throughout |
-| Interface | **Auto-copy** | Automatically copies a chosen version to the clipboard on generation |
+| `SECRET_KEY` | `dev-secret-change-me` | Flask session signing key. Change it for anything beyond local use. |
+| `PORT` | `5000` | Port the dev server binds to. Most hosting platforms set this for you. |
+| `FLASK_DEBUG` | `1` | `1` for the auto-reloader + debugger locally, `0` anywhere else. |
 
-## How the prompt engine works
+Nothing else is required. **Bring-your-own-key API keys are never read
+from environment variables** — they're entered in the Settings panel by
+whoever is using the app, sent with that one request, and never stored
+server-side. See [Security notes](#security-notes).
 
-Kimpto makes exactly **one** API call per generation, not three — the system
-prompt built by `buildSystemPrompt()` asks for all three versions in a
-single structured JSON response, so the versions are generated aware of each
-other instead of independently converging on similar phrasing. Each version
-is bound to a different **structural primitive**, not just a different tone,
-which is what actually forces distinctness:
-
-- **Version 1 (Direct & Concise):** a pure imperative instruction, hard word
-  ceiling, explicitly forbidden from using persona, steps, or examples
-- **Version 2 (Role-Based & Detailed):** must open with an expert persona,
-  must contain a numbered step breakdown, must specify an output format
-- **Version 3 (Creative & Advanced):** must include a `{{variable}}`
-  placeholder and at least one few-shot example pair, must reframe the task
-  from an angle the other two didn't use
-
-`engines.js`'s `extractJSON()` defensively strips markdown code fences and
-locates the outermost `{...}` block before parsing, since not every
-free-tier model reliably honors "respond with only JSON."
-
-## Testing guidelines
-
-Two layers, pick based on what changed:
-
-### 1. Automated — `tests/smoke_test.py`
-A Playwright-driven suite that loads the real app in a headless browser and
-checks the things most likely to silently break: theme switching, the
-console's field count and controls, engine tab visibility, input validation,
-error-path messaging, and that settings actually survive a reload.
+## Testing
 
 ```bash
-pip install playwright
-playwright install chromium
-
-# from the project root, in one terminal:
-python3 -m http.server 8080
-
-# in another terminal:
-python3 tests/smoke_test.py
+pip install -r requirements-dev.txt   # adds pytest on top of the runtime deps
+python -m pytest -q
 ```
 
-It prints a `PASS`/`FAIL` line per check and exits non-zero on any failure,
-so it's safe to drop into a pre-commit hook or a CI job. To test a live
-deployment instead of localhost:
+28 tests cover:
+
+- `tests/test_prompt_engine.py` — every technique produces its expected
+  instruction text, length settings change the target word count,
+  formatting conventions are applied correctly, `extract_json` correctly
+  recovers JSON from a model response even through markdown fences or
+  leading/trailing prose.
+- `tests/test_linter.py` — score bounds, that structure (persona/format/
+  constraints) is rewarded and vague hedge language is penalized.
+- `tests/test_routes.py` — every route via Flask's test client, including
+  that bad input produces clean `400`s and a bad or missing API key
+  produces a clean `400`/`502` rather than an unhandled `500`.
+
+No API keys or network access are needed to run the suite.
+
+## API reference
+
+All request/response bodies are JSON. None of these routes require
+authentication — this app has no user accounts; bring-your-own-key
+requests carry the key with them per-request instead.
+
+### `GET /api/techniques`
+
+Returns the canonical technique catalog (also what the frontend uses to
+build free-tier prompts client-side).
+
+```json
+{
+  "techniques": [
+    {
+      "id": "direct",
+      "label": "Direct & Concise",
+      "principle": "RTF pattern",
+      "short": "One imperative instruction. Role → Task → Format, nothing else.",
+      "instructionTemplate": "Key \"direct\" — ... Hard ceiling of {words} words. ..."
+    }
+  ]
+}
+```
+
+### `GET /api/models`
+
+Returns the free model catalog (grouped by provider), the BYOK
+provider/model lists, and the convention metadata (mark + label per
+vendor).
+
+### `POST /api/lint`
+
+```json
+// request
+{ "text": "You are an expert. Respond in JSON, under 50 words." }
+// response
+{ "score": 90, "wordCount": 10, "tips": ["..."], "checks": {"format": true, "constraints": true, "persona": true, "length": false} }
+```
+
+### `POST /api/generate` (bring-your-own-key only)
+
+```json
+// request
+{
+  "task": "Summarize long customer support tickets into a 3-bullet action list",
+  "details": { "role": "", "audience": "Team leads", "format": "", "constraints": "" },
+  "techniques": ["direct", "role"],
+  "settings": { "length": "standard", "tone": "Neutral", "language": "English", "markdown": false, "negativeConstraints": "" },
+  "provider": "claude",
+  "model": "claude-sonnet-5",
+  "apiKey": "sk-..."
+}
+// response
+{
+  "results": {
+    "direct": { "label": "Direct & Concise", "prompt": "...", "rationale": "...", "lint": { "score": 85, "...": "..." } },
+    "role":   { "label": "Role-Based & Detailed", "prompt": "...", "rationale": "...", "lint": { "...": "..." } }
+  },
+  "convention": "claude"
+}
+```
+
+Errors are always a clean JSON body with an `error` key and an
+appropriate status code — `400` for bad/missing input, `502` if the
+provider call itself fails (bad key, rate limit, network error).
+
+### `POST /api/refine` (bring-your-own-key only)
+
+```json
+// request
+{ "prompt": "current prompt text", "instruction": "make it shorter", "settings": {...}, "provider": "gpt", "model": "gpt-5.5", "apiKey": "sk-..." }
+// response
+{ "prompt": "revised prompt text", "rationale": "Shortened per request", "lint": { "...": "..." } }
+```
+
+### `POST /api/test-run` (bring-your-own-key only)
+
+```json
+// request
+{ "prompt": "the prompt to try", "input": "a sample user message", "provider": "gemini", "model": "gemini-3.1-pro", "apiKey": "..." }
+// response
+{ "output": "the model's response" }
+```
+
+Free-tier generate/refine/test-run never touch these three routes at
+all — they call Puter.js directly from `static/js/api.js`.
+
+## The technique library
+
+Kimpto doesn't generate three arbitrary rewordings of the same idea. Each
+technique is a distinct, documented strategy:
+
+| Technique | Principle | What it does |
+|---|---|---|
+| **Direct & Concise** | Role→Task→Format (RTF) | A single imperative instruction, hard word ceiling, no persona/examples/steps — the fastest usable version. |
+| **Role-Based & Detailed** | Persona framing | Assigns an expert persona, a numbered multi-step breakdown, an explicit output format. |
+| **Creative & Few-Shot** | Few-shot prompting | Includes a `{{variable}}` placeholder and a worked input→output example. |
+| **Chain-of-Thought** | Wei et al., 2022 | Explicitly instructs step-by-step internal reasoning before the final answer, and whether to show or hide that reasoning. |
+| **Structured Output** | Schema pinning | Pins the response to an explicit JSON or Markdown schema, written out inline, for reliable downstream parsing. |
+| **Meta-Prompt** | Self-refine / Reflexion | Instructs the model to draft, critique its own draft, then output only the refined version. |
+
+All wording lives in `kimpto/services/prompt_engine.py::TECHNIQUES` — that
+is the only place to edit it.
+
+## Model-specific formatting conventions
+
+Rather than a single one-size-fits-all format, Kimpto structures every
+generated prompt according to how its target model's own vendor
+documents prompting:
+
+- **Claude (Anthropic)** — wraps sections in XML tags
+  (`<role>`, `<task>`, `<context>`, `<examples>`, `<format>`,
+  `<constraints>`), matching Anthropic's documented guidance that Claude
+  reliably parses XML-tagged structure.
+- **GPT (OpenAI)** — uses Markdown section headers or triple-quote
+  delimited blocks, instructions before context, matching OpenAI's
+  documented prompting guide.
+- **Gemini (Google)** — uses the **PTCF** pattern (Persona, Task,
+  Context, Format) inline, matching Google's documented framework for
+  Gemini prompting.
+- **Universal** — plain structured prose with no vendor-specific markup,
+  used automatically for every other free model (Llama, Mistral,
+  DeepSeek, Qwen, Grok, and so on), where no single documented house
+  style applies.
+
+Which convention is used is **derived automatically** from whichever
+model is selected in Settings — one decision instead of two.
+
+## The free model catalog
+
+42 models across 12 provider families, mirroring the breadth of what
+[Puter.js](https://developer.puter.com) exposes keylessly: OpenAI,
+Anthropic, Google, xAI, DeepSeek, Meta Llama, Mistral, Qwen, Google
+Gemma, Moonshot AI, Z.AI, and Microsoft. The full list lives in
+`kimpto/services/models_catalog.py::FREE_MODEL_GROUPS`.
+
+> Exact model availability on Puter's free tier changes as providers
+> ship new models — check [docs.puter.com](https://docs.puter.com)
+> periodically and update the ids in `models_catalog.py` if any have
+> been renamed or retired.
+
+## Bring your own key
+
+Pick a provider (Claude / GPT / Gemini) and model in Settings, paste an
+API key, and generation routes through this app's own backend using that
+vendor's official Python SDK (`anthropic`, `openai`, or `google-genai`).
+Use this when you want a specific paid model, higher rate limits, or
+guaranteed provider-side data handling terms rather than Puter's.
+
+The key:
+
+- travels with the request body over HTTPS (once deployed behind TLS —
+  see [Deploying](#deploying-the-live-app))
+- is used for exactly one outbound call to that provider
+- is **never** written to a database, a log line, or disk on the server
+- is **never** persisted in the browser's `localStorage` across reloads —
+  `static/js/storage.js` deliberately strips it before saving, so you
+  re-enter it each session
+
+## Putting the code on GitHub
 
 ```bash
-KIMPTO_URL="https://yourname.github.io/kimpto/index.html" python3 tests/smoke_test.py
+cd kimpto
+git init
+git add .
+git commit -m "Initial commit — Kimpto Flask rebuild"
+git branch -M main
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
 ```
 
-**Run this after touching:** `js/config.js`, `js/main.js`, `js/ui.js`, or
-`css/styles.css`'s structural (non-color) rules.
+`.gitignore` already excludes `.venv/`, `__pycache__/`, and `.env`, so
+none of that ends up in the repository.
 
-### 2. Manual — `tests/MANUAL-QA-CHECKLIST.md`
-A ~5-minute click-through checklist for things the automated suite
-deliberately doesn't cover: real API responses (it can't hold your API
-keys), visual correctness across all 4 themes, and the actual OS-level
-"install as app" flow. Also useful if you don't want to set up Python at
-all — it needs nothing but a browser.
+## Deploying the live app
 
-**Run this after touching:** anything visual, `js/engines.js`, or
-`manifest.webmanifest`/`service-worker.js`.
+This is a real Flask application with a Python backend — it needs a host
+that can **run Python**, not just serve static files. A few good, free-
+tier-friendly options:
 
-Both files list which section to re-check for which kind of change, so a
-small edit doesn't require re-testing everything from scratch.
+### Render (recommended — simplest free option)
 
-## Extending Kimpto
+1. Push this repo to GitHub (above).
+2. On [render.com](https://render.com), **New → Web Service**, connect
+   the repo.
+3. Build command: `pip install -r requirements.txt`
+   Start command: `gunicorn app:app`
+4. Set the `SECRET_KEY` environment variable in the dashboard (and any
+   others from `.env.example` you want to override).
+5. Deploy. Render gives you a `https://your-app.onrender.com` URL.
 
-- **Add a Puter model:** append `{ id: "provider/model-id", label: "Display Name" }`
-  to `PUTER_MODELS` in `js/config.js`.
-- **Add a theme:** add a new `[data-theme="yourtheme"]{ ... }` block in
-  `css/styles.css` defining every variable the other themes define, then add
-  `{ id: "yourtheme", label: "Your Theme", swatch: "#hex" }` to `THEMES` in
-  `config.js` — the theme menu and the console's theme dropdown both render
-  from that array automatically.
-- **Add a customization:** add a default to `DEFAULT_SETTINGS`, a control for
-  it in `renderConsole()` in `js/ui.js`, and a line in `buildSystemPrompt()`
-  in `config.js` that actually uses the new setting. All three are required
-  — a control with nothing reading its value is decoration, not a feature.
-- **Add a new engine (e.g. a different provider):** write a `callX()`
-  function in `js/engines.js` matching the signature of the existing three
-  (`systemPrompt, userMessage, settings) => Promise<string>`), then branch to
-  it in `generate()` in `js/main.js`.
+### Railway
 
-## Troubleshooting / FAQ
+1. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
+2. It auto-detects Python and the `Procfile`. Set `SECRET_KEY` in
+   Variables. Deploy.
 
-**The Puter sign-in popup never appears / generation hangs on Free mode.**
-Check your browser's popup blocker for this site. If Kimpto is running
-inside an `<iframe>` (e.g. embedded in another dashboard), the iframe needs
-`allow-popups` and `allow-same-origin` in its `sandbox` attribute.
+### PythonAnywhere
 
-**Groq always fails immediately.**
-That's the CORS block described above — switch to Gemini or the Free
-engine. This isn't a bug in Kimpto; Groq's API isn't designed for
-unauthenticated cross-origin browser calls.
+Good if you want a long-lived free tier without spin-down. Upload the
+repo (or `git clone` from their bash console), create a virtualenv,
+`pip install -r requirements.txt`, then point their WSGI config file at
+`kimpto.create_app()` following their Flask quickstart.
 
-**Gemini returns a 429 or a quota error.**
-You've hit the free-tier rate limit for your key (requests-per-minute or
-per-day). Wait for it to reset, or switch to the Free engine for that
-generation.
+### Fly.io / a plain VPS
 
-**The install icon never shows up in Chrome's address bar.**
-PWA install requires HTTPS (or `localhost`) and a reachable manifest +
-icons. If you're testing over plain `http://` on a non-localhost address,
-Chrome won't offer the install prompt — deploy it or test on `localhost`.
+Works too — `gunicorn app:app` behind any process manager, with a
+reverse proxy (Caddy/nginx) in front for TLS, is all this app needs. No
+Dockerfile is included by default since the platforms above don't need
+one, but this app containerizes trivially if you'd rather go that route.
 
-**I changed the code but my browser still shows the old version.**
-The service worker caches the shell aggressively for speed. Bump the
-`CACHE` constant at the top of `service-worker.js` (e.g. `kimpto-shell-v3`)
-whenever you ship a change — that invalidates the old cache on the next
-load.
+## Why not GitHub Pages?
 
-## Security & privacy
+**GitHub Pages only serves static files — HTML, CSS, and client-side
+JavaScript. It cannot execute Python, so it cannot run this Flask
+backend, full stop.** This isn't a configuration issue to work around;
+it's what GitHub Pages is.
 
-- Everything runs client-side. There's no backend collecting anything.
-- API keys are stored only in `localStorage` in your own browser and are
-  sent only in the request to that key's own provider (Google or Groq) —
-  never to Puter, never anywhere else.
-- If you ever share a deployed URL with someone else who'll use the same
-  browser profile, treat it like sharing a device with your key typed into a
-  form: use the Free engine, or don't save a key there.
-- The service worker only caches same-origin static files (`index.html`,
-  `css/`, `js/`, icons). It never intercepts or caches requests to
-  `js.puter.com`, `generativelanguage.googleapis.com`, or `api.groq.com` —
-  every generation is a fresh network call.
+Practically, this only affects the **bring-your-own-key** routes
+(`/api/generate`, `/api/refine`, `/api/test-run`) — everything else,
+including the entire free tier (Puter.js runs client-side already),
+would keep working on a purely static host. If you specifically want a
+zero-backend, GitHub-Pages-only deployment, the path is to drop the
+Flask BYOK routes and call each provider's API directly from the browser
+instead (each of Anthropic, OpenAI, and Google's APIs support
+browser-based calls with the right CORS/key setup) — that's a genuine
+architectural fork from what's in this repo, not a deployment setting, so
+say the word if you'd like that variant built out instead.
+
+## Security notes
+
+- Bring-your-own-key API keys are request-scoped only — see [Bring your
+  own key](#bring-your-own-key) above.
+- Every route validates its input and returns clean JSON errors
+  (`400`/`502`) rather than leaking stack traces; see
+  `tests/test_routes.py` for the specific cases covered.
+- `kimpto/__init__.py` sets `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: no-referrer` on every response.
+- Set a real, random `SECRET_KEY` before deploying anywhere beyond your
+  own machine.
+- Always deploy behind HTTPS (every platform listed above provides this
+  for free) — the bring-your-own-key flow sends an API key in the
+  request body, which should never travel over plain HTTP.
 
 ## Browser support
 
-Built on standard ES modules, `fetch`, CSS custom properties, and
-`localStorage` — no polyfills, no transpilation. Works in current Chrome,
-Edge, Firefox, and Safari. One-click desktop install (PWA) is a
-Chromium-specific feature (Chrome/Edge); Firefox and Safari users get the
-full app experience in-browser but not the native install prompt.
+| Feature | Requirement |
+|---|---|
+| Core app (generate, refine, compare, library) | Any modern browser |
+| Voice input (dictation) | Chromium-based (Chrome, Edge, Brave, Arc) — `SpeechRecognition` isn't implemented in Firefox or Safari yet |
+| Voice output (read-aloud) | Broadly supported (`SpeechSynthesis`) |
+| Install as an app / offline shell | Any browser supporting Service Workers + a Web App Manifest |
+
+Everything degrades gracefully — if voice input isn't available, the mic
+button is disabled with an explanatory tooltip rather than failing
+silently or breaking the page.
+
+## Known limitations & roadmap
+
+- The free-tier model list is a point-in-time snapshot of Puter's
+  catalog — worth checking periodically (see
+  [The free model catalog](#the-free-model-catalog)).
+- History and the saved-prompt library live in `localStorage`, so they're
+  per-browser, not synced across devices. Adding optional accounts +
+  server-side storage (SQLite to start) is the natural next step if that
+  matters to you.
+- No automated end-to-end browser tests are checked into the repo yet
+  (the backend's 28 pytest tests don't touch the frontend). The frontend
+  was validated manually with Playwright during development — see the
+  screenshots — but a `tests/e2e/` suite would be a good addition.
+- The heuristic linter is intentionally simple pattern-matching, not an
+  LLM-as-judge. That's a deliberate trade-off for instant, free feedback;
+  an optional "deep check" that spends one model call on a real critique
+  would be a reasonable enhancement.
+
+## Credits & research this is grounded in
+
+- [Puter.js](https://developer.puter.com) for free-tier model access.
+- Anthropic's prompt engineering documentation (XML tag structuring,
+  multishot examples).
+- OpenAI's prompt engineering guide (delimiters, instructions-before-
+  context).
+- Google's Gemini prompting guide (the PTCF framework).
+- Wei et al., *"Chain-of-Thought Prompting Elicits Reasoning in Large
+  Language Models"* (2022), for the chain-of-thought technique.
+- The general self-refine / Reflexion line of work, for the meta-prompt
+  technique.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

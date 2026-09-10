@@ -1,0 +1,178 @@
+"""
+Model catalog for Kimpto.
+
+FREE_MODEL_GROUPS mirrors the breadth of models Puter.js exposes keylessly
+(https://developer.puter.com) — grouped by provider family, each tagged with
+which vendor formatting `convention` it should use (see prompt_engine.py).
+BYOK_MODELS is the curated flagship list for the bring-your-own-key path.
+
+Exact model availability on Puter.js's free tier changes over time; verify
+against their live catalog (https://docs.puter.com) before shipping and
+adjust the ids below if any have been renamed or retired.
+"""
+from __future__ import annotations
+
+FREE_MODEL_GROUPS = [
+    {
+        "name": "OpenAI",
+        "accent": "#10a37f",
+        "convention": "gpt",
+        "blurb": "General-purpose, strong all-rounders.",
+        "models": [
+            {"id": "gpt-5.5", "label": "GPT-5.5"},
+            {"id": "gpt-5.4", "label": "GPT-5.4"},
+            {"id": "gpt-5.4-mini", "label": "GPT-5.4 Mini"},
+            {"id": "gpt-5.4-nano", "label": "GPT-5.4 Nano"},
+            {"id": "gpt-4o", "label": "GPT-4o"},
+            {"id": "gpt-4o-mini", "label": "GPT-4o Mini"},
+            {"id": "o4-mini", "label": "o4-mini (reasoning)"},
+            {"id": "o3-mini", "label": "o3-mini (reasoning)"},
+        ],
+    },
+    {
+        "name": "Anthropic",
+        "accent": "#d97757",
+        "convention": "claude",
+        "blurb": "Careful and structured — great at following detailed instructions.",
+        "models": [
+            {"id": "claude-opus-5", "label": "Claude Opus 5"},
+            {"id": "claude-sonnet-5", "label": "Claude Sonnet 5"},
+            {"id": "claude-haiku-4-5", "label": "Claude Haiku 4.5"},
+            {"id": "claude-3-5-sonnet", "label": "Claude 3.5 Sonnet"},
+        ],
+    },
+    {
+        "name": "Google",
+        "accent": "#4285f4",
+        "convention": "gemini",
+        "blurb": "Fast, multimodal, strong on long context.",
+        "models": [
+            {"id": "gemini-3.1-pro", "label": "Gemini 3.1 Pro"},
+            {"id": "gemini-3.7-flash", "label": "Gemini 3.7 Flash"},
+            {"id": "gemini-3.6-flash", "label": "Gemini 3.6 Flash"},
+            {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
+            {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
+            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
+        ],
+    },
+    {
+        "name": "xAI",
+        "accent": "#1a1a1a",
+        "convention": "universal",
+        "blurb": "Real-time aware, casual reasoning style.",
+        "models": [
+            {"id": "grok-4.6", "label": "Grok 4.6"},
+            {"id": "grok-4", "label": "Grok 4"},
+            {"id": "grok-3", "label": "Grok 3"},
+        ],
+    },
+    {
+        "name": "DeepSeek",
+        "accent": "#4d6bfe",
+        "convention": "universal",
+        "blurb": "Excellent at multi-step math & reasoning.",
+        "models": [
+            {"id": "deepseek-v3", "label": "DeepSeek V3"},
+            {"id": "deepseek-r1", "label": "DeepSeek R1 (reasoner)"},
+        ],
+    },
+    {
+        "name": "Meta Llama",
+        "accent": "#0866ff",
+        "convention": "universal",
+        "blurb": "Open-weight, solid generalists.",
+        "models": [
+            {"id": "llama-4-maverick", "label": "Llama 4 Maverick"},
+            {"id": "llama-4-scout", "label": "Llama 4 Scout"},
+            {"id": "llama-3.3-70b", "label": "Llama 3.3 70B"},
+            {"id": "llama-3.1-405b", "label": "Llama 3.1 405B"},
+            {"id": "llama-3.1-8b", "label": "Llama 3.1 8B"},
+        ],
+    },
+    {
+        "name": "Mistral",
+        "accent": "#fa5210",
+        "convention": "universal",
+        "blurb": "Efficient, fast, strong at code.",
+        "models": [
+            {"id": "mistral-large", "label": "Mistral Large"},
+            {"id": "mistral-small", "label": "Mistral Small"},
+            {"id": "mixtral-8x22b", "label": "Mixtral 8x22B"},
+        ],
+    },
+    {
+        "name": "Qwen",
+        "accent": "#6f42ff",
+        "convention": "universal",
+        "blurb": "Strong multilingual performance.",
+        "models": [
+            {"id": "qwen3-235b", "label": "Qwen3 235B"},
+            {"id": "qwen3-32b", "label": "Qwen3 32B"},
+            {"id": "qwen2.5-72b", "label": "Qwen2.5 72B"},
+        ],
+    },
+    {
+        "name": "Google Gemma",
+        "accent": "#34a853",
+        "convention": "universal",
+        "blurb": "Lightweight open models, good for quick drafts.",
+        "models": [
+            {"id": "gemma-4-27b", "label": "Gemma 4 27B"},
+            {"id": "gemma-4-9b", "label": "Gemma 4 9B"},
+            {"id": "gemma-2-27b", "label": "Gemma 2 27B"},
+        ],
+    },
+    {
+        "name": "Moonshot AI",
+        "accent": "#7c3aed",
+        "convention": "universal",
+        "blurb": "Long-context specialist (Kimi).",
+        "models": [{"id": "kimi-k2", "label": "Kimi K2"}],
+    },
+    {
+        "name": "Z.AI",
+        "accent": "#0ea5e9",
+        "convention": "universal",
+        "blurb": "Fast open-weight all-rounder (GLM).",
+        "models": [
+            {"id": "glm-4.6", "label": "GLM-4.6"},
+            {"id": "glm-4.5", "label": "GLM-4.5"},
+        ],
+    },
+    {
+        "name": "Microsoft",
+        "accent": "#00a4ef",
+        "convention": "universal",
+        "blurb": "Compact, efficient small models.",
+        "models": [
+            {"id": "phi-4", "label": "Phi-4"},
+            {"id": "phi-3.5", "label": "Phi-3.5"},
+        ],
+    },
+]
+
+FREE_MODEL_COUNT = sum(len(g["models"]) for g in FREE_MODEL_GROUPS)
+
+BYOK_MODELS = {
+    "claude": [
+        {"id": "claude-opus-5", "label": "Claude Opus 5"},
+        {"id": "claude-sonnet-5", "label": "Claude Sonnet 5"},
+        {"id": "claude-haiku-4-5", "label": "Claude Haiku 4.5"},
+    ],
+    "gpt": [
+        {"id": "gpt-5.5", "label": "GPT-5.5"},
+        {"id": "gpt-5.4", "label": "GPT-5.4"},
+        {"id": "o4-mini", "label": "o4-mini"},
+    ],
+    "gemini": [
+        {"id": "gemini-3.1-pro", "label": "Gemini 3.1 Pro"},
+        {"id": "gemini-3.7-flash", "label": "Gemini 3.7 Flash"},
+    ],
+}
+
+
+def convention_for_free_model(model_id: str) -> str:
+    for group in FREE_MODEL_GROUPS:
+        if any(m["id"] == model_id for m in group["models"]):
+            return group["convention"]
+    return "universal"

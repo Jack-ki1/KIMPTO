@@ -1,0 +1,9 @@
+Flask>=3.0,<4.0
+python-dotenv>=1.0,<2.0
+gunicorn>=22.0,<23.0
+
+# Bring-your-own-key providers (only needed if you use that path in Settings —
+# safe to trim this down to the ones you actually use).
+anthropic>=0.40,<1.0
+openai>=1.50,<2.0
+google-genai>=0.3,<1.0
