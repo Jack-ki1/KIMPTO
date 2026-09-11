@@ -105,6 +105,10 @@ export function buildComposer(state, handlers, { showShuffle, showIndicator }) {
     wrap.appendChild(grid);
   }
 
+  if (state.error) {
+    wrap.appendChild(h("div", { class: "error-banner show", html: icon("alert", 13) + " " + escapeHtml(state.error) }));
+  }
+
   const bar = h("div", { class: "composer-bar" });
   if (!state.refineTarget) {
     bar.appendChild(
@@ -185,10 +189,6 @@ export function renderThread(state, handlers) {
 
   if (state.isGenerating) {
     root.appendChild(renderGeneratingPlaceholder(state));
-  }
-
-  if (state.error) {
-    root.appendChild(h("div", { class: "error-banner show", html: icon("alert", 13) + " " + escapeHtml(state.error) }));
   }
 
   root.appendChild(h("div", { id: "threadEnd" }));
@@ -446,7 +446,12 @@ export function renderSettings(state, handlers) {
         oninput: (e) => handlers.setByokKey(e.target.value),
       })
     );
-    modelSection.appendChild(h("p", { class: "muted small" }, "Stored only in your browser for this session — never sent to Kimpto's servers, and cleared automatically on reload."));
+    modelSection.appendChild(h("p", { class: "muted small" }, "Stored only in your browser for this session — never sent anywhere except straight to the provider you picked, and cleared automatically on reload."));
+    if (state.modelChoice.byokProvider === "gpt") {
+      modelSection.appendChild(
+        h("p", { class: "warning-note" }, "Heads up: OpenAI's API blocks direct requests from a static site (no CORS support), so this will likely fail here. Claude and Gemini both support it directly.")
+      );
+    }
   }
   root.appendChild(modelSection);
   root.appendChild(h("hr", { class: "settings-divider" }));

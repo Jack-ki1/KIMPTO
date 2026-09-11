@@ -1,7 +1,8 @@
 // storage.js — thin localStorage wrapper. Everything Kimpto remembers
 // (session history, the saved-prompt library, model choice, generation
-// settings) lives only in the visitor's own browser; nothing is sent to or
-// stored on the Flask server. Wrapped in try/catch throughout since
+// settings) lives only in the visitor's own browser; this is a static
+// site with no server at all, so there's nowhere else it could go.
+// Wrapped in try/catch throughout since
 // localStorage can throw in private-browsing modes or when full.
 
 const KEY = "kimpto_state_v1";

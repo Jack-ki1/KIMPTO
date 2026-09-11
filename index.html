@@ -1,6 +1,24 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kimpto — Prompt Engineering Studio</title>
+  <meta name="description" content="Kimpto turns a task description into several prompt-engineered versions, grounded in real prompting research, with a 40+ free model tier and bring-your-own-key support for Claude, GPT, and Gemini." />
+  <meta name="theme-color" content="#0e0e11" />
 
-{% block body %}
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="icons/favicon-64.png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
 <div id="app">
   <p id="bootError" class="boot-error" hidden></p>
 
@@ -77,9 +95,15 @@
 
   <div id="toastContainer" class="toast-container"></div>
 </div>
-{% endblock %}
 
-{% block scripts %}
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+  }
+</script>
 <script src="https://js.puter.com/v2/"></script>
-<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
-{% endblock %}
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
