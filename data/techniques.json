@@ -1,0 +1,46 @@
+{
+  "techniques": [
+    {
+      "id": "direct",
+      "label": "Direct & Concise",
+      "principle": "RTF pattern",
+      "short": "One imperative instruction. Role \u2192 Task \u2192 Format, nothing else.",
+      "instructionTemplate": "Key \"direct\" \u2014 Direct & Concise: a single pure imperative instruction following Role\u2192Task\u2192Format. Hard ceiling of {words} words. FORBIDDEN: persona assignment, numbered steps, examples, background context."
+    },
+    {
+      "id": "role",
+      "label": "Role-Based & Detailed",
+      "principle": "Persona framing",
+      "short": "Expert persona, numbered steps, explicit output format.",
+      "instructionTemplate": "Key \"role\" \u2014 Role-Based & Detailed: open by assigning a specific expert persona (\"You are a...\"), include a numbered breakdown of at least 3 steps, and specify an explicit output format. Target roughly {words} words."
+    },
+    {
+      "id": "fewshot",
+      "label": "Creative & Few-Shot",
+      "principle": "Few-shot examples",
+      "short": "A {{variable}} placeholder plus one input\u2192output example pair.",
+      "instructionTemplate": "Key \"fewshot\" \u2014 Creative & Few-Shot: include at least one {{variable}} placeholder and one short worked example (\"Input: ... -> Output: ...\"), reframing the task from a fresh angle. Target roughly {words} words."
+    },
+    {
+      "id": "cot",
+      "label": "Chain-of-Thought",
+      "principle": "Wei et al., reasoning",
+      "short": "Instructs step-by-step reasoning before the final answer.",
+      "instructionTemplate": "Key \"cot\" \u2014 Chain-of-Thought: explicitly instruct the model to reason step-by-step internally before giving a final answer, and state whether the reasoning should be shown or hidden. Target roughly {words} words."
+    },
+    {
+      "id": "structured",
+      "label": "Structured Output",
+      "principle": "Schema pinning",
+      "short": "Pins the response to an explicit schema for reliable parsing.",
+      "instructionTemplate": "Key \"structured\" \u2014 Structured Output: pin the response to an explicit schema (JSON keys with types, or a fixed Markdown structure) written out inline. Target roughly {words} words."
+    },
+    {
+      "id": "metaprompt",
+      "label": "Meta-Prompt",
+      "principle": "Self-refine / Reflexion",
+      "short": "Asks the model to draft, critique, then refine its own approach.",
+      "instructionTemplate": "Key \"metaprompt\" \u2014 Meta-Prompt: instruct the model to silently draft an approach, critique it against the task's goals, then produce only the refined final instruction. Target roughly {words} words."
+    }
+  ]
+}

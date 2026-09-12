@@ -1,12 +1,11 @@
-// service-worker.js — caches the static app shell so Kimpto still opens
-// (to a "you're offline" experience for the UI chrome) without a network
-// connection. Generation itself always needs a live network round trip
-// (to Puter.js or directly to whichever provider you picked in Settings),
-// so it can't work offline — this only protects the shell.
+// service-worker.js — caches the static app shell for offline opening.
+// Generation itself always needs a live network connection (to Puter.js,
+// or directly to Claude/Gemini for bring-your-own-key), so it can't work
+// offline — this only protects the shell (HTML/CSS/JS/icons).
 //
-// All paths here are relative to this file's own location, which matters
-// for GitHub Pages project sites served from a subpath
-// (https://username.github.io/repo-name/) rather than a domain root.
+// Registered with a relative path from index.html, and every asset below
+// is relative too, so this works correctly whether the site is served
+// from a domain root or a GitHub Pages project subpath.
 
 const CACHE_NAME = "kimpto-shell-v1";
 const SHELL_ASSETS = [
@@ -22,6 +21,8 @@ const SHELL_ASSETS = [
   "./js/voice.js",
   "./js/storage.js",
   "./manifest.webmanifest",
+  "./data/techniques.json",
+  "./data/models.json",
 ];
 
 self.addEventListener("install", (event) => {
@@ -41,8 +42,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Never cache calls to Puter.js or any provider API — those must always
-  // hit the network live, and none of them share this origin.
+  // Never cache calls to Puter.js or any provider's API — those must
+  // always hit the network live.
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(

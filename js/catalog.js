@@ -1,174 +1,58 @@
 // catalog.js
 //
-// This is the static-site counterpart of the Flask build's catalog.js. In
-// the Flask version, technique wording and the model catalog lived once in
-// Python (kimpto/services/prompt_engine.py) and the browser fetched them
-// from GET /api/techniques and GET /api/models. A static site has no
-// server to fetch from, so that data is inlined here instead — this file
-// is now the single source of truth. If you ever bring the Flask backend
-// back, keep prompt_engine.py and this file in sync by hand.
+// Fetches the technique and model catalogs from the Flask backend
+// (kimpto/services/prompt_engine.py and models_catalog.py are the source of
+// truth) and mirrors the same prompt-assembly + heuristic-linting logic in
+// JavaScript. That mirror is required, not optional: free-tier generation
+// calls Puter.js directly from the browser (Puter's keyless access only
+// works in a real browser context), so it can never round-trip through the
+// Flask backend the way bring-your-own-key generation does. Keeping the
+// wording itself server-authoritative (fetched, not hardcoded here) means
+// there is still only one place technique copy is written by hand.
 
 const LENGTH_WORDS = { short: 30, standard: 55, long: 95 };
 
-/* =========================================================================
-   TECHNIQUE LIBRARY — six techniques covering the bulk of production
-   prompt-engineering use cases (role/task/format, few-shot, chain-of-
-   thought, structured output, meta-prompting, self-refine).
-   ========================================================================= */
+let _techniques = null;
+let _models = null;
 
-const TECHNIQUES = [
-  {
-    id: "direct",
-    label: "Direct & Concise",
-    principle: "RTF pattern",
-    short: "One imperative instruction. Role → Task → Format, nothing else.",
-    instructionTemplate:
-      'Key "direct" — Direct & Concise: a single pure imperative instruction following Role→Task→Format. Hard ceiling of {words} words. FORBIDDEN: persona assignment, numbered steps, examples, background context.',
-  },
-  {
-    id: "role",
-    label: "Role-Based & Detailed",
-    principle: "Persona framing",
-    short: "Expert persona, numbered steps, explicit output format.",
-    instructionTemplate:
-      'Key "role" — Role-Based & Detailed: open by assigning a specific expert persona ("You are a..."), include a numbered breakdown of at least 3 steps, and specify an explicit output format. Target roughly {words} words.',
-  },
-  {
-    id: "fewshot",
-    label: "Creative & Few-Shot",
-    principle: "Few-shot examples",
-    short: "A {{variable}} placeholder plus one input→output example pair.",
-    instructionTemplate:
-      'Key "fewshot" — Creative & Few-Shot: include at least one {{variable}} placeholder and one short worked example ("Input: ... -> Output: ..."), reframing the task from a fresh angle. Target roughly {words} words.',
-  },
-  {
-    id: "cot",
-    label: "Chain-of-Thought",
-    principle: "Wei et al., reasoning",
-    short: "Instructs step-by-step reasoning before the final answer.",
-    instructionTemplate:
-      'Key "cot" — Chain-of-Thought: explicitly instruct the model to reason step-by-step internally before giving a final answer, and state whether the reasoning should be shown or hidden. Target roughly {words} words.',
-  },
-  {
-    id: "structured",
-    label: "Structured Output",
-    principle: "Schema pinning",
-    short: "Pins the response to an explicit schema for reliable parsing.",
-    instructionTemplate:
-      'Key "structured" — Structured Output: pin the response to an explicit schema (JSON keys with types, or a fixed Markdown structure) written out inline. Target roughly {words} words.',
-  },
-  {
-    id: "metaprompt",
-    label: "Meta-Prompt",
-    principle: "Self-refine / Reflexion",
-    short: "Asks the model to draft, critique, then refine its own approach.",
-    instructionTemplate:
-      'Key "metaprompt" — Meta-Prompt: instruct the model to silently draft an approach, critique it against the task\'s goals, then produce only the refined final instruction. Target roughly {words} words.',
-  },
-];
-
-const TECHNIQUES_BY_ID = Object.fromEntries(TECHNIQUES.map((t) => [t.id, t]));
-
-/* =========================================================================
-   MODEL CATALOG
-   ========================================================================= */
-
-const FREE_MODEL_GROUPS = [
-  { name: "OpenAI", accent: "#10a37f", convention: "gpt", blurb: "General-purpose, strong all-rounders.",
-    models: [
-      { id: "gpt-5.5", label: "GPT-5.5" }, { id: "gpt-5.4", label: "GPT-5.4" },
-      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" }, { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
-      { id: "gpt-4o", label: "GPT-4o" }, { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-      { id: "o4-mini", label: "o4-mini (reasoning)" }, { id: "o3-mini", label: "o3-mini (reasoning)" },
-    ] },
-  { name: "Anthropic", accent: "#d97757", convention: "claude", blurb: "Careful and structured — great at following detailed instructions.",
-    models: [
-      { id: "claude-opus-5", label: "Claude Opus 5" }, { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
-      { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" }, { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-    ] },
-  { name: "Google", accent: "#4285f4", convention: "gemini", blurb: "Fast, multimodal, strong on long context.",
-    models: [
-      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro" }, { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash" },
-      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" }, { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }, { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-    ] },
-  { name: "xAI", accent: "#1a1a1a", convention: "universal", blurb: "Real-time aware, casual reasoning style.",
-    models: [ { id: "grok-4.6", label: "Grok 4.6" }, { id: "grok-4", label: "Grok 4" }, { id: "grok-3", label: "Grok 3" } ] },
-  { name: "DeepSeek", accent: "#4d6bfe", convention: "universal", blurb: "Excellent at multi-step math & reasoning.",
-    models: [ { id: "deepseek-v3", label: "DeepSeek V3" }, { id: "deepseek-r1", label: "DeepSeek R1 (reasoner)" } ] },
-  { name: "Meta Llama", accent: "#0866ff", convention: "universal", blurb: "Open-weight, solid generalists.",
-    models: [
-      { id: "llama-4-maverick", label: "Llama 4 Maverick" }, { id: "llama-4-scout", label: "Llama 4 Scout" },
-      { id: "llama-3.3-70b", label: "Llama 3.3 70B" }, { id: "llama-3.1-405b", label: "Llama 3.1 405B" }, { id: "llama-3.1-8b", label: "Llama 3.1 8B" },
-    ] },
-  { name: "Mistral", accent: "#fa5210", convention: "universal", blurb: "Efficient, fast, strong at code.",
-    models: [ { id: "mistral-large", label: "Mistral Large" }, { id: "mistral-small", label: "Mistral Small" }, { id: "mixtral-8x22b", label: "Mixtral 8x22B" } ] },
-  { name: "Qwen", accent: "#6f42ff", convention: "universal", blurb: "Strong multilingual performance.",
-    models: [ { id: "qwen3-235b", label: "Qwen3 235B" }, { id: "qwen3-32b", label: "Qwen3 32B" }, { id: "qwen2.5-72b", label: "Qwen2.5 72B" } ] },
-  { name: "Google Gemma", accent: "#34a853", convention: "universal", blurb: "Lightweight open models, good for quick drafts.",
-    models: [ { id: "gemma-4-27b", label: "Gemma 4 27B" }, { id: "gemma-4-9b", label: "Gemma 4 9B" }, { id: "gemma-2-27b", label: "Gemma 2 27B" } ] },
-  { name: "Moonshot AI", accent: "#7c3aed", convention: "universal", blurb: "Long-context specialist (Kimi).",
-    models: [ { id: "kimi-k2", label: "Kimi K2" } ] },
-  { name: "Z.AI", accent: "#0ea5e9", convention: "universal", blurb: "Fast open-weight all-rounder (GLM).",
-    models: [ { id: "glm-4.6", label: "GLM-4.6" }, { id: "glm-4.5", label: "GLM-4.5" } ] },
-  { name: "Microsoft", accent: "#00a4ef", convention: "universal", blurb: "Compact, efficient small models.",
-    models: [ { id: "phi-4", label: "Phi-4" }, { id: "phi-3.5", label: "Phi-3.5" } ] },
-];
-const FREE_MODEL_COUNT = FREE_MODEL_GROUPS.reduce((n, g) => n + g.models.length, 0);
-
-// Bring-your-own-key models. Gemini deliberately lists only Flash-tier
-// models — per Google AI Studio guidance, these are the best fit for a
-// personal AI Studio API key (generous free-tier quota, low latency);
-// Pro-tier models are better suited to paid/Vertex AI billing, so they're
-// left off this list on purpose.
-const BYOK_MODELS = {
-  claude: [
-    { id: "claude-opus-5", label: "Claude Opus 5" },
-    { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
-    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-  ],
-  gpt: [
-    { id: "gpt-5.5", label: "GPT-5.5" },
-    { id: "gpt-5.4", label: "GPT-5.4" },
-    { id: "o4-mini", label: "o4-mini" },
-  ],
-  gemini: [
-    { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
-    { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash" },
-  ],
-};
-
-const MODELS = { free: FREE_MODEL_GROUPS, freeCount: FREE_MODEL_COUNT, byok: BYOK_MODELS };
-
-// Kept as an async no-op so main.js's existing `await loadCatalog()` still
-// works unchanged — there's simply nothing to fetch anymore.
 export async function loadCatalog() {
-  return { techniques: TECHNIQUES, models: MODELS };
+  // Static build: technique/model data is pre-generated from the same
+  // Python source of truth (kimpto/services/prompt_engine.py and
+  // models_catalog.py) into these two JSON files by scripts/build_data.py
+  // — see README.md. Re-run that script after editing either Python file.
+  const [techRes, modelRes] = await Promise.all([
+    fetch("./data/techniques.json").then((r) => r.json()),
+    fetch("./data/models.json").then((r) => r.json()),
+  ]);
+  _techniques = techRes.techniques;
+  _models = modelRes;
+  return { techniques: _techniques, models: _models };
 }
 
 export function getTechniques() {
-  return TECHNIQUES;
+  return _techniques || [];
 }
 export function getTechniqueById(id) {
-  return TECHNIQUES_BY_ID[id];
+  return (_techniques || []).find((t) => t.id === id);
 }
 export function getModels() {
-  return MODELS;
+  return _models;
 }
 
 export function conventionForFreeModel(modelId) {
-  const group = FREE_MODEL_GROUPS.find((g) => g.models.some((m) => m.id === modelId));
+  const groups = (_models && _models.free) || [];
+  const group = groups.find((g) => g.models.some((m) => m.id === modelId));
   return group ? group.convention : "universal";
 }
 
 export function currentModelLabel(modelChoice) {
   if (modelChoice.mode === "byok") {
-    const list = BYOK_MODELS[modelChoice.byokProvider] || [];
+    const list = (_models && _models.byok[modelChoice.byokProvider]) || [];
     const model = list.find((m) => m.id === modelChoice.byokModel);
     return (model ? model.label : modelChoice.byokModel) + " · your key";
   }
-  const group = FREE_MODEL_GROUPS.find((g) => g.models.some((m) => m.id === modelChoice.free));
+  const groups = (_models && _models.free) || [];
+  const group = groups.find((g) => g.models.some((m) => m.id === modelChoice.free));
   const model = group ? group.models.find((m) => m.id === modelChoice.free) : null;
   return (model ? model.label : modelChoice.free) + " · free";
 }
@@ -188,7 +72,7 @@ const CONVENTION_INSTRUCTIONS = {
     "Formatting convention — Universal: write each generated prompt as clear structured prose without vendor-specific markup, so it reads naturally when pasted into any model.",
 };
 
-// --- prompt assembly ------------------------------------------------------
+// --- prompt assembly (mirrors kimpto/services/prompt_engine.py) ---------
 
 export function buildSystemPrompt(techniqueIds, settings, convention) {
   const base = LENGTH_WORDS[settings.length] || LENGTH_WORDS.standard;
@@ -266,7 +150,7 @@ export function extractJSON(raw) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
-// --- linter ----------------------------------------------------------------
+// --- linter (mirrors kimpto/services/linter.py) -------------------------
 
 export function lintPrompt(text) {
   const t = text || "";
@@ -296,7 +180,7 @@ export function lintPrompt(text) {
   return { score, wordCount, tips, checks };
 }
 
-// --- misc text utilities ----------------------------------------------------
+// --- misc text utilities -------------------------------------------------
 
 export function findVariables(text) {
   const set = new Set();
